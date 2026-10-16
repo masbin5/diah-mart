@@ -1,3 +1,6 @@
-/** Static export: works with Cloudflare Pages and other static hosting. */
-const nextConfig = { output: 'export' };
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  images: { unoptimized: true },
+};
+
 export default nextConfig;

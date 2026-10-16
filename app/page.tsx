@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Check, Clock3, Instagram, MapPin, Menu, Minus, Phone, Plus, Search, ShoppingBag, ShoppingBasket, Snowflake, Sparkles, Trash2, X } from 'lucide-react';
 import { STORE, categories, products, type Product } from './data';
 
@@ -36,16 +36,27 @@ export default function Home() {
   const [buyerName, setBuyerName] = useState('');
   const [note, setNote] = useState('');
   const [delivery, setDelivery] = useState<'Ambil di toko' | 'Tanya pengantaran'>('Ambil di toko');
+  const [prices, setPrices] = useState<Record<number, number>>({});
 
-  const filtered = useMemo(() => products.filter(p => (category === 'Semua' || p.category === category) && p.name.toLowerCase().includes(search.toLowerCase())), [category, search]);
+  // Ambil harga terbaru dari database (diatur lewat halaman /admin)
+  useEffect(() => {
+    fetch('/api/prices')
+      .then(r => r.json())
+      .then(setPrices)
+      .catch(() => {}); // kalau gagal, pakai harga bawaan di data.ts
+  }, []);
+
+  const items = useMemo(() => products.map(p => ({ ...p, price: prices[p.id] ?? p.price })), [prices]);
+
+  const filtered = useMemo(() => items.filter(p => (category === 'Semua' || p.category === category) && p.name.toLowerCase().includes(search.toLowerCase())), [items, category, search]);
   const count = Object.values(cart).reduce((a, b) => a + b, 0);
-  const selected = products.filter(p => cart[p.id] > 0);
+  const selected = items.filter(p => cart[p.id] > 0);
   const total = selected.reduce((a, p) => a + p.price * cart[p.id], 0);
   const updateCart = (id: number, delta: number) => setCart(current => { const next = { ...current }; next[id] = Math.max(0, (next[id] ?? 0) + delta); if (!next[id]) delete next[id]; return next; });
   const checkout = () => {
     if (!selected.length) return;
-    const items = selected.map((p, i) => `${i + 1}. ${p.name} (${cart[p.id]} × ${rupiah(p.price)}) = ${rupiah(cart[p.id] * p.price)}`).join('\n');
-    const msg = `Halo DIAH MART! Saya mau pesan:\n\n${items}\n\n*Estimasi total: ${rupiah(total)}*\nNama: ${buyerName.trim() || '-'}\nMetode: ${delivery}\nCatatan: ${note.trim() || '-'}\n\nMohon konfirmasi stok, harga terbaru, dan detail pemesanan ya. Terima kasih!`;
+    const lines = selected.map((p, i) => `${i + 1}. ${p.name} (${cart[p.id]} × ${rupiah(p.price)}) = ${rupiah(cart[p.id] * p.price)}`).join('\n');
+    const msg = `Halo DIAH MART! Saya mau pesan:\n\n${lines}\n\n*Estimasi total: ${rupiah(total)}*\nNama: ${buyerName.trim() || '-'}\nMetode: ${delivery}\nCatatan: ${note.trim() || '-'}\n\nMohon konfirmasi stok, harga terbaru, dan detail pemesanan ya. Terima kasih!`;
     window.open(waLink(msg), '_blank', 'noopener,noreferrer');
   };
   const toProducts = () => { document.getElementById('produk')?.scrollIntoView({ behavior: 'smooth' }); setMobileNav(false); };
@@ -54,7 +65,7 @@ export default function Home() {
     <div className="announcement"><Sparkles size={14} /> Belanja kebutuhan harian jadi lebih gampang di DIAH MART <Sparkles size={14} /></div>
     <header className="header"><div className="container nav">
       <a className="brand" href="#beranda" aria-label="DIAH MART beranda"><Logo width={96} height={62} /></a>
-      <nav className={mobileNav ? 'nav-links open' : 'nav-links'}><a href="#beranda" onClick={() => setMobileNav(false)}>Beranda</a><a href="#kategori" onClick={() => setMobileNav(false)}>Kategori</a><a href="#produk" onClick={() => setMobileNav(false)}>Produk</a><a href="#tentang" onClick={() => setMobileNav(false)}>Tentang Kami</a></nav>
+      <nav className={mobileNav ? 'nav-links open' : 'nav-links'}><a href="#beranda" onClick={() => setMobileNav(false)}>Beranda</a><a href="#kategori" onClick={() => setMobileNav(false)}>Kategori</a><a href="#produk" onClick={() => setMobileNav(false)}>Produk</a><a href="#tentang" onClick={() => setMobileNav(false)}>Tentang Kami</a><a href="/admin">Admin</a></nav>
       <div className="nav-actions"><button className="cart-btn" onClick={() => setCartOpen(true)} aria-label={`Keranjang berisi ${count} barang`}><ShoppingBag size={21} /><span>Keranjang</span>{count > 0 && <b>{count}</b>}</button><button className="menu-btn" onClick={() => setMobileNav(v => !v)} aria-label="Buka menu">{mobileNav ? <X /> : <Menu />}</button></div>
     </div></header>
 
