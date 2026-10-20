@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, Check, Clock3, Instagram, MapPin, Menu, Minus, Phone, Plus, Search, ShoppingBag, ShoppingBasket, Snowflake, Sparkles, Trash2, X } from 'lucide-react';
 import { STORE, categories, products, type Product } from './data';
 
@@ -23,6 +23,39 @@ function Logo({ width = 130, height = 88 }: { width?: number; height?: number })
       width={width}
       height={height}
       style={{ width, height, objectFit: 'cover', objectPosition: '50% 46%', display: 'block' }}
+    />
+  );
+}
+
+// Foto produk dari /public/produk. Kalau belum ada / gagal dimuat, tampil emoji.
+function ProductImage({ src, emoji, alt }: { src?: string; emoji: string; alt: string }) {
+  const [failed, setFailed] = useState(false);
+  const ref = useRef<HTMLImageElement>(null);
+
+  useEffect(() => {
+    const img = ref.current;
+    if (img && img.complete && img.naturalWidth === 0) setFailed(true);
+  }, [src]);
+
+  if (!src || failed) return <span className="product-emoji">{emoji}</span>;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      ref={ref}
+      src={src}
+      alt={alt}
+      loading="lazy"
+      onError={() => setFailed(true)}
+      style={{
+        position: 'absolute',
+        inset: 0,
+        width: '100%',
+        height: '100%',
+        objectFit: 'contain',
+        padding: 10,
+        boxSizing: 'border-box',
+        background: '#fff',
+      }}
     />
   );
 }
@@ -77,8 +110,8 @@ export default function Home() {
       <section className="perks"><div className="container perk-grid"><div><span className="perk-icon"><ShoppingBag size={23} /></span><span><strong>Belanja lebih praktis</strong><small>Pilih barang dari rumah</small></span></div><div><span className="perk-icon"><Snowflake size={23} /></span><span><strong>Frozen food &amp; sembako</strong><small>Kebutuhan sehari-hari</small></span></div><div><span className="perk-icon"><Phone size={23} /></span><span><strong>Pesan via WhatsApp</strong><small>Konfirmasi langsung ke toko</small></span></div></div></section>
 
       <section id="produk" className="section products-section"><div className="container"><div className="section-head"><div><span className="overline">PILIHAN DIAH MART</span><h2>Produk untuk <em>setiap hari</em></h2><p>Cari barang yang kamu butuhkan dan tambahkan ke keranjang.</p></div><span className="stock-note">Harga &amp; stok dikonfirmasi saat pesan</span></div><div className="toolbar"><div className="chips">{categories.map(c => <button key={c.name} onClick={() => setCategory(c.name)} className={category === c.name ? 'chip active' : 'chip'}>{c.emoji} {c.name}</button>)}</div><label className="search"><Search size={19} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari produk..." aria-label="Cari produk" /></label></div>
-      {filtered.length ? <div className="product-grid">{filtered.map((p: Product) => <article className="product-card" key={p.id}><div className={`product-art ${p.color}`}><span className="product-emoji">{p.emoji}</span>{p.label && <span className="product-label">{p.label}</span>}</div><div className="product-info"><span className="product-cat">{p.category}</span><h3>{p.name}</h3><div className="price">{rupiah(p.price)}<small> / {p.unit}</small></div><button className="add-button" onClick={() => updateCart(p.id, 1)}>{cart[p.id] ? <><Check size={17} /> Tambah lagi ({cart[p.id]})</> : <><Plus size={17} /> Tambah ke keranjang</>}</button></div></article>)}</div> : <div className="empty-state">🔍 Produk tidak ditemukan. Coba kata kunci lain atau kategori berbeda.</div>}
-      <p className="disclaimer">* Produk, gambar ilustrasi, dan harga di website ini merupakan data contoh. Pastikan informasi diperbarui sesuai stok DIAH MART.</p></div></section>
+      {filtered.length ? <div className="product-grid">{filtered.map((p: Product) => <article className="product-card" key={p.id}><div className={`product-art ${p.color}`}><ProductImage src={p.image} emoji={p.emoji} alt={p.name} />{p.label && <span className="product-label">{p.label}</span>}</div><div className="product-info"><span className="product-cat">{p.category}</span><h3>{p.name}</h3><div className="price">{rupiah(p.price)}<small> / {p.unit}</small></div><button className="add-button" onClick={() => updateCart(p.id, 1)}>{cart[p.id] ? <><Check size={17} /> Tambah lagi ({cart[p.id]})</> : <><Plus size={17} /> Tambah ke keranjang</>}</button></div></article>)}</div> : <div className="empty-state">🔍 Produk tidak ditemukan. Coba kata kunci lain atau kategori berbeda.</div>}
+      <p className="disclaimer">* Gambar produk bersifat ilustrasi. Harga dan stok dikonfirmasi oleh DIAH MART saat pemesanan.</p></div></section>
 
       <section className="cta-section"><div className="container"><div className="cta-card"><div><span className="overline">BUTUH SESUATU?</span><h2>Belum nemu barang <em>yang dicari?</em></h2><p>Chat langsung ke DIAH MART, tanya ketersediaan barang atau konfirmasi pesanan.</p><a className="cta-white" href={waLink('Halo DIAH MART! Saya mau tanya ketersediaan barang.')} target="_blank" rel="noreferrer">Chat via WhatsApp <ArrowRight size={19} /></a></div><div className="cta-art">🛍️<span>💚</span></div></div></div></section>
 
@@ -87,6 +120,6 @@ export default function Home() {
 
     <footer><div className="container footer-content"><div className="footer-brand"><div className="brand"><Logo width={150} height={100} /></div><p>Frozen food, sembako, kebutuhan dapur &amp; rumah tangga untuk sehari-hari.</p></div><div><strong>Jelajahi</strong><a href="#beranda">Beranda</a><a href="#kategori">Kategori</a><a href="#produk">Produk</a><a href="#tentang">Tentang</a></div><div><strong>Kontak</strong><a href={waLink('Halo DIAH MART!')} target="_blank" rel="noreferrer">WhatsApp Toko</a><a href={mapsLink} target="_blank" rel="noopener noreferrer">{STORE.address}</a><span style={{ whiteSpace: 'pre-line' }}>{STORE.hours}</span></div></div><div className="container copyright">© {new Date().getFullYear()} DIAH MART. Dibuat dengan 💚 untuk belanja keluarga.</div></footer>
 
-    {cartOpen && <div className="cart-overlay" onMouseDown={e => { if (e.target === e.currentTarget) setCartOpen(false); }}><aside className="cart-panel" role="dialog" aria-modal="true" aria-label="Keranjang belanja"><div className="cart-header"><div><h2>Keranjangmu 🛍️</h2><p>{count} barang dipilih</p></div><button onClick={() => setCartOpen(false)} aria-label="Tutup keranjang"><X /></button></div><div className="cart-body">{selected.length ? selected.map(p => <div className="cart-item" key={p.id}><div className={`cart-item-art ${p.color}`}>{p.emoji}</div><div className="cart-item-info"><strong>{p.name}</strong><small>{rupiah(p.price)} / {p.unit}</small><div className="quantity"><button onClick={() => updateCart(p.id, -1)} aria-label={`Kurangi ${p.name}`}><Minus size={14} /></button><b>{cart[p.id]}</b><button onClick={() => updateCart(p.id, 1)} aria-label={`Tambah ${p.name}`}><Plus size={14} /></button></div></div><button className="delete" aria-label={`Hapus ${p.name}`} onClick={() => setCart(c => { const n = { ...c }; delete n[p.id]; return n; })}><Trash2 size={17} /></button></div>) : <div className="cart-empty"><ShoppingBag size={48} /><h3>Keranjang masih kosong</h3><p>Yuk, pilih dulu produk favoritmu!</p><button className="primary" onClick={() => { setCartOpen(false); toProducts(); }}>Lihat Produk <ArrowRight size={17} /></button></div>}</div>{selected.length > 0 && <div className="cart-footer"><label>Nama pemesan (opsional)<input value={buyerName} onChange={e => setBuyerName(e.target.value)} placeholder="Nama kamu" /></label><label>Cara pemesanan <select value={delivery} onChange={e => setDelivery(e.target.value as typeof delivery)}><option>Ambil di toko</option><option>Tanya pengantaran</option></select></label><label>Catatan (opsional)<textarea rows={2} value={note} onChange={e => setNote(e.target.value)} placeholder="Mis. mau tanya stok dan ongkir" /></label><div className="total"><span>Estimasi total</span><strong>{rupiah(total)}</strong></div><p className="cart-caption">Harga &amp; ketersediaan final dikonfirmasi oleh toko melalui WhatsApp.</p><button className="checkout" onClick={checkout}>Pesan lewat WhatsApp <ArrowRight size={19} /></button></div>}</aside></div>}
+    {cartOpen && <div className="cart-overlay" onMouseDown={e => { if (e.target === e.currentTarget) setCartOpen(false); }}><aside className="cart-panel" role="dialog" aria-modal="true" aria-label="Keranjang belanja"><div className="cart-header"><div><h2>Keranjangmu 🛍️</h2><p>{count} barang dipilih</p></div><button onClick={() => setCartOpen(false)} aria-label="Tutup keranjang"><X /></button></div><div className="cart-body">{selected.length ? selected.map(p => <div className="cart-item" key={p.id}><div className={`cart-item-art ${p.color}`}><ProductImage src={p.image} emoji={p.emoji} alt={p.name} /></div><div className="cart-item-info"><strong>{p.name}</strong><small>{rupiah(p.price)} / {p.unit}</small><div className="quantity"><button onClick={() => updateCart(p.id, -1)} aria-label={`Kurangi ${p.name}`}><Minus size={14} /></button><b>{cart[p.id]}</b><button onClick={() => updateCart(p.id, 1)} aria-label={`Tambah ${p.name}`}><Plus size={14} /></button></div></div><button className="delete" aria-label={`Hapus ${p.name}`} onClick={() => setCart(c => { const n = { ...c }; delete n[p.id]; return n; })}><Trash2 size={17} /></button></div>) : <div className="cart-empty"><ShoppingBag size={48} /><h3>Keranjang masih kosong</h3><p>Yuk, pilih dulu produk favoritmu!</p><button className="primary" onClick={() => { setCartOpen(false); toProducts(); }}>Lihat Produk <ArrowRight size={17} /></button></div>}</div>{selected.length > 0 && <div className="cart-footer"><label>Nama pemesan (opsional)<input value={buyerName} onChange={e => setBuyerName(e.target.value)} placeholder="Nama kamu" /></label><label>Cara pemesanan <select value={delivery} onChange={e => setDelivery(e.target.value as typeof delivery)}><option>Ambil di toko</option><option>Tanya pengantaran</option></select></label><label>Catatan (opsional)<textarea rows={2} value={note} onChange={e => setNote(e.target.value)} placeholder="Mis. mau tanya stok dan ongkir" /></label><div className="total"><span>Estimasi total</span><strong>{rupiah(total)}</strong></div><p className="cart-caption">Harga &amp; ketersediaan final dikonfirmasi oleh toko melalui WhatsApp.</p><button className="checkout" onClick={checkout}>Pesan lewat WhatsApp <ArrowRight size={19} /></button></div>}</aside></div>}
   </>;
 }
