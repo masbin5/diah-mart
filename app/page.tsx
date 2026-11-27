@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, Check, Clock3, Instagram, MapPin, Menu, Minus, Phone, Plus, Search, ShoppingBag, ShoppingBasket, Snowflake, Sparkles, Trash2, X } from 'lucide-react';
-import { STORE, categories, products, type Product } from './data';
+import { STORE, categories, products } from './data';
 
 type Cart = Record<number, number>;
+type Override = { name?: string; price?: number; stock?: number | null };
 
 // Nama file logo di folder /public (huruf besar/kecil harus persis sama)
 const LOGO_SRC = '/Diahmartt.png';
@@ -67,23 +68,34 @@ export default function Home() {
   const [buyerName, setBuyerName] = useState('');
   const [note, setNote] = useState('');
   const [delivery, setDelivery] = useState<'Ambil di toko' | 'Tanya pengantaran'>('Ambil di toko');
-  const [prices, setPrices] = useState<Record<number, number>>({});
+  const [overrides, setOverrides] = useState<Record<number, Override>>({});
 
-  // Ambil harga terbaru dari database (diatur lewat halaman /admin)
+  // Ambil nama, harga, dan stok terbaru dari database (diatur lewat halaman /admin)
   useEffect(() => {
-    fetch('/api/prices')
+    fetch('/api/products')
       .then(r => r.json())
-      .then(setPrices)
-      .catch(() => {}); // kalau gagal, pakai harga bawaan di data.ts
+      .then(setOverrides)
+      .catch(() => {}); // kalau gagal, pakai data bawaan di data.ts
   }, []);
 
-  const items = useMemo(() => products.map(p => ({ ...p, price: prices[p.id] ?? p.price })), [prices]);
+  const items = useMemo(() => products.map(p => {
+    const o = overrides[p.id];
+    return { ...p, name: o?.name || p.name, price: o?.price ?? p.price, stock: o?.stock ?? null };
+  }), [overrides]);
 
   const filtered = useMemo(() => items.filter(p => (category === 'Semua' || p.category === category) && p.name.toLowerCase().includes(search.toLowerCase())), [items, category, search]);
   const count = Object.values(cart).reduce((a, b) => a + b, 0);
-  const selected = items.filter(p => cart[p.id] > 0);
+  const selected = items.filter(p => cart[p.id] > 0 && p.stock !== 0);
   const total = selected.reduce((a, p) => a + p.price * cart[p.id], 0);
-  const updateCart = (id: number, delta: number) => setCart(current => { const next = { ...current }; next[id] = Math.max(0, (next[id] ?? 0) + delta); if (!next[id]) delete next[id]; return next; });
+  const updateCart = (id: number, delta: number) => setCart(current => {
+    const stock = items.find(p => p.id === id)?.stock;
+    const next = { ...current };
+    let qty = Math.max(0, (next[id] ?? 0) + delta);
+    if (stock != null) qty = Math.min(qty, stock);
+    next[id] = qty;
+    if (!qty) delete next[id];
+    return next;
+  });
   const checkout = () => {
     if (!selected.length) return;
     const lines = selected.map((p, i) => `${i + 1}. ${p.name} (${cart[p.id]} × ${rupiah(p.price)}) = ${rupiah(cart[p.id] * p.price)}`).join('\n');
@@ -108,7 +120,7 @@ export default function Home() {
       <section className="perks"><div className="container perk-grid"><div><span className="perk-icon"><ShoppingBag size={23} /></span><span><strong>Belanja lebih praktis</strong><small>Pilih barang dari rumah</small></span></div><div><span className="perk-icon"><Snowflake size={23} /></span><span><strong>Frozen food &amp; sembako</strong><small>Kebutuhan sehari-hari</small></span></div><div><span className="perk-icon"><Phone size={23} /></span><span><strong>Pesan via WhatsApp</strong><small>Konfirmasi langsung ke toko</small></span></div></div></section>
 
       <section id="produk" className="section products-section"><div className="container"><div className="section-head"><div><span className="overline">PILIHAN DIAH MART</span><h2>Produk untuk <em>setiap hari</em></h2><p>Cari barang yang kamu butuhkan dan tambahkan ke keranjang.</p></div><span className="stock-note">Harga &amp; stok dikonfirmasi saat pesan</span></div><div className="toolbar"><div className="chips">{categories.map(c => <button key={c.name} onClick={() => setCategory(c.name)} className={category === c.name ? 'chip active' : 'chip'}>{c.emoji} {c.name}</button>)}</div><label className="search"><Search size={19} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari produk..." aria-label="Cari produk" /></label></div>
-      {filtered.length ? <div className="product-grid">{filtered.map((p: Product) => <article className="product-card" key={p.id}><div className={`product-art ${p.color}`}><ProductImage src={p.image} emoji={p.emoji} alt={p.name} />{p.label && <span className="product-label">{p.label}</span>}</div><div className="product-info"><span className="product-cat">{p.category}</span><h3>{p.name}</h3><div className="price">{rupiah(p.price)}<small> / {p.unit}</small></div><button className="add-button" onClick={() => updateCart(p.id, 1)}>{cart[p.id] ? <><Check size={17} /> Tambah lagi ({cart[p.id]})</> : <><Plus size={17} /> Tambah ke keranjang</>}</button></div></article>)}</div> : <div className="empty-state">🔍 Produk tidak ditemukan. Coba kata kunci lain atau kategori berbeda.</div>}
+      {filtered.length ? <div className="product-grid">{filtered.map(p => <article className="product-card" key={p.id}><div className={`product-art ${p.color}`}><ProductImage src={p.image} emoji={p.emoji} alt={p.name} />{p.label && <span className="product-label">{p.label}</span>}</div><div className="product-info"><span className="product-cat">{p.category}</span><h3>{p.name}</h3><div className="price">{rupiah(p.price)}<small> / {p.unit}</small></div>{p.stock != null && p.stock > 0 && p.stock <= 5 && <small style={{ color: '#be185d', fontWeight: 700 }}>Sisa {p.stock}</small>}{p.stock === 0 ? <button className="add-button" disabled style={{ opacity: 0.55, cursor: 'not-allowed' }}>Stok habis</button> : <button className="add-button" onClick={() => updateCart(p.id, 1)}>{cart[p.id] ? <><Check size={17} /> Tambah lagi ({cart[p.id]})</> : <><Plus size={17} /> Tambah ke keranjang</>}</button>}</div></article>)}</div> : <div className="empty-state">🔍 Produk tidak ditemukan. Coba kata kunci lain atau kategori berbeda.</div>}
       <p className="disclaimer">* Gambar produk bersifat ilustrasi. Harga dan stok dikonfirmasi oleh DIAH MART saat pemesanan.</p></div></section>
 
       <section className="cta-section"><div className="container"><div className="cta-card"><div><span className="overline">BUTUH SESUATU?</span><h2>Belum nemu barang <em>yang dicari?</em></h2><p>Chat langsung ke DIAH MART, tanya ketersediaan barang atau konfirmasi pesanan.</p><a className="cta-white" href={waLink('Halo DIAH MART! Saya mau tanya ketersediaan barang.')} target="_blank" rel="noreferrer">Chat via WhatsApp <ArrowRight size={19} /></a></div><div className="cta-art">🛍️<span>💜</span></div></div></div></section>
